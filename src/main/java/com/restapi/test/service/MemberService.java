@@ -13,6 +13,7 @@ import com.restapi.test.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -32,43 +33,80 @@ public class MemberService {
     private final ApiResponseService apiResponseService;
 
     // 회원가입
-    public String join(MemberJoinDto member) {
+//    public String join(MemberJoinDto member) {
+//        ApiResponseModel apiResponse = null;
+//        try {
+//            // password 암호화: BCrypt Hashing
+//            member.setPassword(passwordEncoder.encode(member.getPassword()));
+//            // 주민등록번호 암호화: AES256
+//            member.setRegNo((new AES256()).encrypt(member.getRegNo()));
+//
+//            // 회원 Id 중복 체크
+//            if(!validateUserId(member.getUserId())) {
+//                MemberDto memberDto = MemberDto.builder()
+//                        .userId(member.getUserId())
+//                        .build();
+//                apiResponse = apiResponseService.getApiResponse("fail", "이미 가입된 Id 입니다.", memberDto);
+//            }
+//            // 주민등록번호 중복 체크
+//            else if(!validateRegNo(member.getRegNo())) {
+//                apiResponse = apiResponseService.getApiResponse("fail", "이미 가입된 주민등록번호 입니다.", "");
+//            }
+//            // 가입 가능한 정보
+//            else {
+//                MemberEntity newMember = memberRepository.save(MemberEntity.builder()
+//                        .userId(member.getUserId())
+//                        .password(member.getPassword())
+//                        .name(member.getName())
+//                        .regNo(member.getRegNo())
+//                        .build());
+//
+//                MemberDto memberDto = MemberDto.builder()
+//                        .userId(newMember.getUserId())
+//                        .build();
+//
+//                //apiResponse = apiResponseService.getApiResponse("success", "", memberDto);
+//            }
+//        } catch (Exception e) {
+//            apiResponse = apiResponseService.getApiResponse("fail", "회원가입에 실패하였습니다.", "");
+//        }
+//
+//        return (new Gson()).toJson(apiResponse);
+//    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public String join(MemberJoinDto member) throws Exception {
         ApiResponseModel apiResponse = null;
-        try {
-            // password 암호화: BCrypt Hashing
-            member.setPassword(passwordEncoder.encode(member.getPassword()));
-            // 주민등록번호 암호화: AES256
-            member.setRegNo((new AES256()).encrypt(member.getRegNo()));
+        // password 암호화: BCrypt Hashing
+        member.setPassword(passwordEncoder.encode(member.getPassword()));
+        // 주민등록번호 암호화: AES256
+        member.setRegNo((new AES256()).encrypt(member.getRegNo()));
 
-            // 회원 Id 중복 체크
-            if(!validateUserId(member.getUserId())) {
-                MemberDto memberDto = MemberDto.builder()
-                        .userId(member.getUserId())
-                        .build();
+        // 회원 Id 중복 체크
+        if (!validateUserId(member.getUserId())) {
+            MemberDto memberDto = MemberDto.builder()
+                    .userId(member.getUserId())
+                    .build();
+            apiResponse = apiResponseService.getApiResponse("fail", "이미 가입된 Id 입니다.", memberDto);
+        }
+        // 주민등록번호 중복 체크
+        else if (!validateRegNo(member.getRegNo())) {
+            apiResponse = apiResponseService.getApiResponse("fail", "이미 가입된 주민등록번호 입니다.", "");
+        }
+        // 가입 가능한 정보
+        else {
+            MemberEntity newMember = save(MemberEntity.builder()
+                    .userId(member.getUserId())
+                    .password(member.getPassword())
+                    .name(member.getName())
+                    .regNo(member.getRegNo())
+                    .build());
 
-                apiResponse = apiResponseService.getApiResponse("fail", "이미 가입된 Id 입니다.", memberDto);
-            }
-            // 주민등록번호 중복 체크
-            else if(!validateRegNo(member.getRegNo())) {
-                apiResponse = apiResponseService.getApiResponse("fail", "이미 가입된 주민등록번호 입니다.", "");
-            }
-            // 가입 가능한 정보
-            else {
-                MemberEntity newMember = save(MemberEntity.builder()
-                        .userId(member.getUserId())
-                        .password(member.getPassword())
-                        .name(member.getName())
-                        .regNo(member.getRegNo())
-                        .build());
+            MemberDto memberDto = MemberDto.builder()
+                    .userId(newMember.getUserId())
+                    .build();
 
-                MemberDto memberDto = MemberDto.builder()
-                        .userId(newMember.getUserId())
-                        .build();
-
-                apiResponse = apiResponseService.getApiResponse("success", "", memberDto);
-            }
-        } catch (Exception e) {
-            apiResponse = apiResponseService.getApiResponse("fail", "회원가입에 실패하였습니다.", "");
+            apiResponse = apiResponseService.getApiResponse("success", "", memberDto);
         }
 
         return (new Gson()).toJson(apiResponse);
@@ -84,16 +122,16 @@ public class MemberService {
             Optional<MemberEntity> memberEntity = memberRepository.findById(loginInfo.getUserId());
 
             // 일치하는 Id가 없을 때
-            if(memberEntity.isEmpty()) {        
+            if(memberEntity.isEmpty()) {
                 apiResponse = apiResponseService.getApiResponse("fail", "가입되지 않은 Id 입니다.", "");
             }
             // 일치하는 Id가 있을 때
             else {
                 member = memberEntity.get();
                 // 비밀번호가 틀렸을 때
-                if (!passwordEncoder.matches(loginInfo.getPassword(), member.getPassword())) {          
+                if (!passwordEncoder.matches(loginInfo.getPassword(), member.getPassword())) {
                     apiResponse = apiResponseService.getApiResponse("fail", "잘못된 비밀번호입니다.", "");
-                } 
+                }
                 // 비밀번호가 일치했을 때
                 else {
                     // 로그인 성공 시 token 발행 후 결과로 전송할 TokenInfoDto에 저장

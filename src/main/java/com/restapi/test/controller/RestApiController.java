@@ -36,7 +36,11 @@ public class RestApiController {
     @ApiOperation(value="회원가입", notes="")
     @PostMapping("/v1/signup")
     public String signup(@RequestBody @ApiParam(value="회원가입할 때 필요한 회원 정보", required = true) @Valid MemberJoinDto member) {
-        return memberService.join(member);
+        try {
+            return memberService.join(member);
+        } catch (Exception e) {
+            return (new Gson()).toJson(apiResponseService.getApiResponse("fail", "회원가입에 실패하였습니다.", ""));
+        }
     }
 
     @ApiOperation(value="로그인", notes="userId와 password로 로그인, jwt token 발급")
